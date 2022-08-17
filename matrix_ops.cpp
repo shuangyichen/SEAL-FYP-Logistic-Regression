@@ -187,16 +187,18 @@ void slowEncoding(size_t poly_modulus_degree)
     // Close script
     outscript.close();
 
-    EncryptionParameters params(scheme_type::CKKS);
+    EncryptionParameters params(scheme_type::ckks);
     params.set_poly_modulus_degree(poly_modulus_degree);
     params.set_coeff_modulus(CoeffModulus::BFVDefault(poly_modulus_degree));
 
-    auto context = SEALContext::Create(params);
+    auto context = SEALContext(params);
 
     // Generate keys, encryptor, decryptor and evaluator
     KeyGenerator keygen(context);
-    PublicKey pk = keygen.public_key();
+    //PublicKey pk = keygen.public_key();
     SecretKey sk = keygen.secret_key();
+    PublicKey pk;
+    keygen.create_public_key(pk);
 
     Encryptor encryptor(context, pk);
     Evaluator evaluator(context);

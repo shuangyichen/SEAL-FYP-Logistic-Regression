@@ -7,9 +7,9 @@
 using namespace std;
 using namespace seal;
 
-#define POLY_MOD_DEGREE 16384
+#define POLY_MOD_DEGREE 32768
 #define DEGREE 3
-#define ITERS 10
+#define ITERS 2
 #define LEARNING_RATE 0.1
 
 template <typename T>
@@ -204,7 +204,8 @@ Ciphertext Horner_cipher(Ciphertext ctx, int degree, vector<double> coeffs, CKKS
     return temp;
 }
 
-// Predict Ciphertext Weights
+// Predict Cipher
+//text Weights
 Ciphertext predict_cipher_weights(vector<Ciphertext> features, Ciphertext weights, int num_weights, double scale, Evaluator &evaluator, CKKSEncoder &ckks_encoder, GaloisKeys gal_keys, RelinKeys relin_keys, Encryptor &encryptor, EncryptionParameters params)
 {
     cout << "->" << __func__ << endl;
@@ -260,6 +261,8 @@ Ciphertext predict_cipher_weights(vector<Ciphertext> features, Ciphertext weight
         exit(EXIT_FAILURE);
     }
 
+    //Ciphertext predict_res = Horner_cipher(lintransf_vec, coeffs.size() - 1, coeffs, ckks_encoder, scale, evaluator, encryptor, relin_keys, params);
+    //Ciphertext predict_res = Tree_cipher(lintransf_vec, coeffs.size() - 1, scale, coeffs, ckks_encoder, evaluator, encryptor, relin_keys, params);
     Ciphertext predict_res = Horner_cipher(lintransf_vec, coeffs.size() - 1, coeffs, ckks_encoder, scale, evaluator, encryptor, relin_keys, params);
     cout << "->" << __LINE__ << endl;
     return predict_res;
@@ -328,6 +331,8 @@ Ciphertext update_weights(vector<Ciphertext> features, vector<Ciphertext> featur
     cout << "LR / num_obs = " << N << endl;
 
     Plaintext N_pt;
+    cout<<"Scale"<<endl;
+    cout<<scale<<endl;
     ckks_encoder.encode(N, scale, N_pt);
     // Mod Switch N_pt
     evaluator.mod_switch_to_inplace(N_pt, gradient.parms_id());
@@ -335,12 +340,19 @@ Ciphertext update_weights(vector<Ciphertext> features, vector<Ciphertext> featur
     cout << "->" << __LINE__ << endl;
     evaluator.multiply_plain_inplace(gradient, N_pt); // ERROR HERE: CIPHERTEXT IS TRANSPARENT
     // I fixed this error, just change "ckks_encoder.encode(N, N_pt);" to "ckks_encoder.encode(N, scale, N_pt);", line 331
-
+    //cout<< "mul"<<endl;
     // Subtract from weights
+    //cout<<gradient.parms_id()<<endl;
+    //cout<<weights.parms_id()<<endl;
     Ciphertext new_weights;
+    //evaluator.mod_switch_to_inplace(weights,gradient.parms_id());
+    evaluator.rescale_to_next_inplace(weights);
+    weights.scale() = pow(2, (int)log2(gradient.scale()));
+    evaluator.mod_switch_to_inplace(weights,gradient.parms_id());
     evaluator.sub(gradient, weights, new_weights);
+    cout<< "sub"<<endl;
     evaluator.negate_inplace(new_weights);
-
+    cout<< "negate"<<endl;
     return new_weights;
 }
 
@@ -365,7 +377,7 @@ Ciphertext train_cipher(vector<Ciphertext> features, vector<Ciphertext> features
         ckks_encoder.decode(new_weights_pt, new_weights_decoded);
 
         // Log Progress
-        if (i % 5 == 0)
+        if (i % 1 == 0)
         {
             cout << "\nIteration:\t" << i << endl;
 
@@ -418,7 +430,8 @@ int main()
     EncryptionParameters params(scheme_type::ckks);
 
     params.set_poly_modulus_degree(POLY_MOD_DEGREE);
-    params.set_coeff_modulus(CoeffModulus::Create(POLY_MOD_DEGREE, {60, 40, 40, 40, 40, 40, 40, 40, 60}));
+    params.set_coeff_modulus(CoeffModulus::Create(POLY_MOD_DEGREE, {60, 40,40, 40, 40, 40, 40, 40, 40, 60}));
+    //params.set_coeff_modulus(CoeffModulus::Create(POLY_MOD_DEGREE, {60, 50, 50, 50, 50, 50, 50, 50,50,50,50,50,50,50,50, 60}));
     // "scale out of bounds" because primes are not sufficient
 
     double scale = pow(2.0, 40);
@@ -444,7 +457,7 @@ int main()
     CKKSEncoder ckks_encoder(context);
 
     print_parameters(tmp);
-
+    /*
     // -------------------------- TEST SIGMOID APPROXIMATION ---------------------------
     cout << "\n------------------- TEST SIGMOID APPROXIMATION -------------------\n"
          << endl;
@@ -491,7 +504,7 @@ int main()
     time_end = chrono::high_resolution_clock::now();
     time_diff = chrono::duration_cast<chrono::microseconds>(time_end - time_start);
     cout << "Polynomial Evaluation Duration:\t" << time_diff.count() << " microseconds" << endl;
-
+    
     // Decrypt and decode
     Plaintext pt_res_sigmoid;
     decryptor.decrypt(ct_res_sigmoid, pt_res_sigmoid);
@@ -513,18 +526,19 @@ int main()
 
     double horner_error = abs(res_sigmoid_vec[0] - expected_approx_res);
     cout << "CKKS Error: Diff Actual and Expected =\t" << horner_error << endl;
-
+    */
     // --------------------------- TEST LR -----------------------------------------
     cout << "\n--------------------------- TEST LR CKKS ---------------------------\n"
          << endl;
 
     // Read File
-    string filename = "pulsar_stars_copy.csv";
+    string filename = "/home/shuangyi/shuangyi/SEAL-FYP-Logistic-Regression/pulsar_stars.csv";
     vector<vector<string>> s_matrix = CSVtoMatrix(filename);
     vector<vector<double>> f_matrix = stringToDoubleMatrix(s_matrix);
 
     // Init features, labels and weights
     // Init features (rows of f_matrix , cols of f_matrix - 1)
+    
     int rows = f_matrix.size();
     cout << "\nNumber of rows  = " << rows << endl;
     int cols = f_matrix[0].size() - 1;
@@ -652,6 +666,6 @@ int main()
     // predictions = predict_cipher_weights(features_ct, weights_ct, num_weights, scale, evaluator, ckks_encoder, gal_keys, relin_keys, encryptor, params);
 
     Ciphertext new_weights = train_cipher(features_ct, features_T_ct, labels_ct, weights_ct, LEARNING_RATE, ITERS, observations, num_weights, evaluator, ckks_encoder, scale, gal_keys, relin_keys, encryptor, decryptor, params);
-
+    
     return 0;
 }

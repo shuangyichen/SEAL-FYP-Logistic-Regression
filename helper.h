@@ -412,6 +412,9 @@ vector<vector<double>> get_U_transpose(vector<vector<T>> U)
     return U_transpose;
 }
 
+//Ciphertext cipher_dot_product(Ciphertext ctA, Ciphertext ctB, int size, RelinKeys relin_keys, GaloisKeys gal_keys, Evaluator &evaluat
+
+
 // Ciphertext dot product
 Ciphertext cipher_dot_product(Ciphertext ctA, Ciphertext ctB, int size, RelinKeys relin_keys, GaloisKeys gal_keys, Evaluator &evaluator)
 {
@@ -563,8 +566,10 @@ vector<vector<string>> CSVtoMatrix(string filename)
     ifstream data(filename);
     string line;
     int line_count = 0;
+    //while (line_count < 100){
     while (getline(data, line))
     {
+    	if (line_count<3){
         stringstream lineStream(line);
         string cell;
         vector<string> parsedRow;
@@ -578,23 +583,31 @@ vector<vector<string>> CSVtoMatrix(string filename)
             result_matrix.push_back(parsedRow);
         }
         line_count++;
+    	}
+	else{
+	break;
+	}
     }
+    //}
+    cout <<"CSV to matrix"<<endl;
     return result_matrix;
 }
 
 // String matrix to float matrix converter
 vector<vector<double>> stringToDoubleMatrix(vector<vector<string>> matrix)
 {
+    cout<<matrix.size()<<endl;
+    cout<<matrix[0].size()<<endl;
     vector<vector<double>> result(matrix.size(), vector<double>(matrix[0].size()));
     for (int i = 0; i < matrix.size(); i++)
     {
         for (int j = 0; j < matrix[0].size(); j++)
         {
             result[i][j] = ::atof(matrix[i][j].c_str());
-            result[i][j] = static_cast<double>(result[i][j]);
+            result[i][j] = static_cast<double>(result[i][j]/255);
         }
     }
-
+    cout<<"string to double matrix"<<endl;
     return result;
 }
 
